@@ -5,6 +5,7 @@ const PORT = process.env.PORT || 3306;
 let newRoleName;
 let roleList;
 let depList;
+let mngrList;
 
 const connection = mysql.createConnection({
   host: 'localhost',
@@ -90,7 +91,7 @@ function listAllEmployees() {
 
 //add employees
 async function addEmployee() {
-
+  queryManagerList();
   connection.query("SELECT * FROM role;", async (err, roleRes) => {
     inquirer.prompt([{
       type: "input",
@@ -100,7 +101,15 @@ async function addEmployee() {
       type: "input",
       message: "Please Enter Employee's Last Name ",
       name: "lastName"
-    }, {
+    },  {
+      type: "rawlist",
+      message: "Employees's Manager : ",
+      name: "empManager",
+      choices: ['No Manager', ...(mngrList.map(mngr => {
+         return `${mngr['First Name']} - ${mngr['Last Name']}`;
+        }
+      ))]
+    },{
       type: "rawlist",
       message: "What is Employee's Role?",
       name: "empRole",
@@ -108,6 +117,22 @@ async function addEmployee() {
         return role.title;
       }))]
     }]).then(async (employeeInfo) => {
+      let mngrId;
+      if(employeeInfo.empManager === 'No Manager'){
+           mngrId = '';
+      } else 
+      if(employeeInfo.empManager !== 'No Manager'){
+        mngrList.map(mngr => {
+         if(employeeInfo.empManager === `${mngr['First Name']} - ${mngr['Last Name']}`){
+          mngrId = mngr['Manager Id'];
+         }
+         }
+       )
+      }
+
+    
+
+
 
         if (employeeInfo.empRole === 'New Role') {
 
@@ -122,7 +147,7 @@ async function addEmployee() {
                 return el.id;
               }
             })[0],
-            manager_id: 1
+            manager_id: mngrId
           }, (err) => {
             if (err) {
               console.log(err)
@@ -413,6 +438,23 @@ function queryDepartmentList() {
       });
       depList = list;
       return list;
+    }
+  })
+}
+
+
+function queryManagerList() {
+  connection.query("SELECT e.first_name AS 'First Name', e.last_name AS 'Last Name', e.manager_id AS 'Manager Id', r.title As 'Title'  FROM employee e LEFT JOIN role r ON e.manager_id = r.id ;", (err, mngrRes) => {
+
+    if (err) {
+      console.log("error : " + err);
+    } else {
+     // let list = ['Add New Department'];
+      // mngrRes.map(mngr => {
+      //   list.push(mngr.name);
+      // });
+      mngrList = mngrRes;
+      return mngrList;
     }
   })
 }
