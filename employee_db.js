@@ -55,7 +55,7 @@ function runUserRequest() {
           break;
 
         case "Add Employee":
-         addEmployee();
+          addEmployee();
           // console.log(depList)
           break;
 
@@ -91,8 +91,8 @@ function listAllEmployees() {
 //add employees
 async function addEmployee() {
 
-  connection.query("SELECT * FROM role;",  async (err, roleRes) => {
-     inquirer.prompt([{
+  connection.query("SELECT * FROM role;", async (err, roleRes) => {
+    inquirer.prompt([{
       type: "input",
       message: "Please Enter Employee's First Name ",
       name: "firstName"
@@ -101,89 +101,83 @@ async function addEmployee() {
       message: "Please Enter Employee's Last Name ",
       name: "lastName"
     }, {
-      type: "list",
+      type: "rawlist",
       message: "What is Employee's Role?",
       name: "empRole",
       choices: ['New Role', ...(roleRes.map(role => {
         return role.title;
       }))]
     }]).then(async (employeeInfo) => {
-      let currentRole;
-      let newAdded =false;
-    //  let newCurrentRole;
-      if (employeeInfo.empRole === 'New Role') {
-     
-          addNewRole(employeeInfo);
-      
+
+        if (employeeInfo.empRole === 'New Role') {
+
+        await  addNewRole(employeeInfo);
+
+        } else {
+          connection.query("INSERT INTO employee SET ?", {
+            first_name: employeeInfo.firstName,
+            last_name: employeeInfo.lastName,
+            role_id: roleRes.map(el => {
+              if (el.title === employeeInfo.empRole) {
+                return el.id;
+              }
+            })[0],
+            manager_id: 1
+          }, (err) => {
+            if (err) {
+              console.log(err)
+            }
+          })
+          // queryRoleList();
+          // runUserRequest();
+        }
+
+
+        // currentRole = roleRes.map(role => {
+        //   if (role.title === employeeInfo.empRole) {
+        //     return role;
+        //   };
+        // });
+
+        // connection.query("INSERT INTO employee SET ?", {
+        //   first_name: employeeInfo.firstName,
+        //   last_name: employeeInfo.lastName,
+        //   role_id: currentRole[0].id,
+        //   manager_id: 1
+        // }, (err) => {
+        //   if (err) {
+        //     console.log(err)
+        //   }
+        // })
+
+        listAllEmployees();
       }
-  else {
 
-       if(newAdded === true) {
-        connection.query("SELECT * FROM role;",  (err, newRoleRes) => {
-            if (err) throw err;
-        
-            inquirer.prompt([{
-              type: "list",
-              message: "What is Employee's Role?",
-              name: "empRole",
-              choices: newRoleRes.map(role => {
-                return role.title;
-              })
-            }]).then((newAnswer)=>{
-              // newCurrentRole = answer.empRole;
-              newRoleRes.map(role => {
-                if (role.title === newAnswer.empRole) {
-                  return currentRole = role;
-               
-                };
-              })
-            })
-          }
-        )
-      } 
-        currentRole = roleRes.map(role => {
-          if (role.title === employeeInfo.empRole) {
-            return role;
-          };
-        });
-      
-      // connection.query("INSERT INTO employee SET ?", {
-      //   first_name: employeeInfo.firstName,
-      //   last_name: employeeInfo.lastName,
-      //   role_id: currentRole[0].id,
-      //   manager_id: 1
-      // }, (err) => {
-      //   if (err) {
-      //     console.log(err)
-      //   }
-      // })
-
-      listAllEmployees();
-    }
-
+    )
   })
-
-})
 }
+
 
 function employeesByDepartment() {
   connection.query("SELECT * FROM department;", (err, depRes) => {
 
     inquirer.prompt([{
-      type: "list",
+      type: "rawlist",
       message: "Which Department Employee's do you want to see?",
       name: "depName",
       choices: depRes.map(dep => {
         return dep.name;
       })
     }]).then((res) => {
-      let currentDep = depRes.map(dep => {
+      let currentDep;
+       depRes.map(dep => {
         if (dep.name === res.depName) {
-          return dep;
+           currentDep = dep;
         };
       });
-      connection.query("SELECT  e.id AS 'ID', e.first_name AS 'First Name', e.last_name AS 'Last Name', r.title AS 'Title', d.name AS 'Department' FROM employee e RIGHT JOIN role r ON e.role_id = r.id RIGHT JOIN  department d ON r.department_id = d.id WHERE ?;", {
-          'd.id': currentDep[0].id
+
+      connection.query("SELECT  e.id AS 'ID', e.first_name AS 'First Name', e.last_name AS 'Last Name', r.title AS 'Title', d.name AS 'Department' FROM employee e RIGHT JOIN role r ON e.role_id = r.id RIGHT JOIN  department d ON r.department_id = d.id WHERE ? ;", {
+          'd.id': currentDep.id
         },
         (err, res) => {
           console.log("currentDep = " + JSON.stringify(currentDep));
@@ -200,7 +194,7 @@ function employeeByManager() {
   connection.query("SELECT * FROM employee RIGHT JOIN role ON employee.manager_id = role.id;", (err, empRes) => {
 
     inquirer.prompt([{
-      type: "list",
+      type: "rawlist",
       message: "View employee's under Manager : ",
       name: "mngName",
       choices: empRes.map(mng => {
@@ -230,7 +224,7 @@ function removeEmployee() {
   connection.query("SELECT id, first_name AS 'First Name', last_name AS 'Last Name' FROM employee;", (err, empRes) => {
     let empId;
     inquirer.prompt([{
-      type: "list",
+      type: "rawlist",
       message: "Select employee you would like to Delete",
       name: "empName",
       choices: empRes.map(emp => {
@@ -257,33 +251,35 @@ function removeEmployee() {
 function updateEmployeeRole() {
   connection.query("SELECT e.id, e.first_name AS 'First Name', e.last_name AS 'Last Name', r.title AS 'Title' FROM employee E LEFT JOIN role r ON e.role_id = r.id;", (err, empRes) => {
     let empId;
+    let roleid;
     inquirer.prompt([{
-      type: "list",
+      type: "rawlist",
       message: "Select employee you would like to Update",
       name: "empName",
       choices: empRes.map(emp => {
         return `${emp.id} - ${emp['First Name']} ${emp['Last Name']} ${emp['Title']}`;
       })
-    }]).then(res => {
+    }]).then(selectEmpRes => {
       connection.query("SELECT * FROM role;", (err, roleRes) => {
 
         inquirer.prompt([{
-          type: "list",
-          message: "Which Department Employee's do you want to see?",
+          type: "rawlist",
+          message: "To what role would you like to update ? ",
           name: "roleTitle",
           choices: roleRes.map(role => {
             return role.title;
           })
         }]).then((res) => {
-          let currentRole = roleRes.map(role => {
+          let currentRole =  [];
+           roleRes.map(role => {
             if (role.title === res.roleTitle) {
-              return role;
+              currentRole.push(role);
             };
           });
 
           empRes.forEach(emp => {
-            if (res.empName === `${emp.id} - ${emp['First Name']} ${emp['Last Name']} ${emp['Title']}`) {
-              empId = emp.id;
+            if (selectEmpRes.empName === `${emp.id} - ${emp['First Name']} ${emp['Last Name']} ${emp['Title']}`) {
+              return empId = emp.id;
             }
           });
           connection.query("UPDATE employee SET ? WHERE ? ;", [{
@@ -306,9 +302,9 @@ function updateEmployeeRole() {
 
 
 
- function addNewRole(employeeInfo) {
-  
-  inquirer.prompt([{
+async function addNewRole(employeeInfo) {
+
+  await inquirer.prompt([{
     name: 'newRoleTitle',
     type: 'input',
     message: "Enter new role title : ",
@@ -324,17 +320,12 @@ function updateEmployeeRole() {
     //  ['Add New Department', ...(depArr.map(dep =>{
     //   return dep.title;
     // }))]
-  }]).then((answer) => {
+  }]).then(async (answer) => {
     //set new roleNAME AS global variable
     newRoleName = answer.newRoleTitle;
     let department;
     if (answer.department === 'Add New Department') {
-     department = addNewDepartment(answer, employeeInfo)
-      // department = queryDepartmentList().map(dep => {
-      //   if (addNewDepartment() === dep.name) {
-      //     return dep;
-      //   }
-    //  })
+      department = await addNewDepartment(answer, employeeInfo)
     } else {
       department = queryDepartmentList().map(dep => {
         if (answer.department === dep.name) {
@@ -342,31 +333,13 @@ function updateEmployeeRole() {
         }
       })
     }
-
-    // connection.query("INSERT INTO role  SET ?", {
-    //     title: answer.newRoleTitle,
-    //     salary: answer.newRoleSalary,
-    //     department_id: department.id,
-    //   },
-    //   function (err, res) {
-    //     if (err) {
-    //       console.log("error : " + err)
-    //     } else {
-    //       console.log("new role added");
-    //       return queryRoleList();
-    //     }
-    //   }
-
-    // )
   })
 
 }
 
+async function addNewDepartment(roleAnswers, employeeInfo) {
 
-
-function addNewDepartment(roleAnswers, employeeInfo) {
-
-  inquirer.prompt([{
+  await inquirer.prompt([{
     name: "newDepartmentName",
     type: "input",
     message: "Enter new Department name : ",
@@ -374,38 +347,38 @@ function addNewDepartment(roleAnswers, employeeInfo) {
     connection.query("INSERT INTO department SET name = ? ",
       [answer.newDepartmentName],
       function (err, res) {
-        console.log("why res = " , res);
+        console.log("why res = ", res);
         if (err) {
           console.log(err);
         } else {
           connection.query("INSERT INTO role  SET ?", {
-            title: roleAnswers.newRoleTitle,
-            salary: roleAnswers.newRoleSalary,
-            department_id: res.insertId,
-          },
-          function (err, roleInsertRes) {
-            if (err) {
-              console.log("error : " + err)
-            } else {
-              queryRoleList();
-              console.log("new role added");
-              console.log("empInfo = " , employeeInfo)
-      connection.query("INSERT INTO employee SET ?", {
-        first_name: employeeInfo.firstName,
-        last_name: employeeInfo.lastName,
-        role_id: roleInsertRes.insertId,
-        manager_id: 1
-      }, (err) => {
-        if (err) {
-          console.log(err)
-        }
-      })
+              title: roleAnswers.newRoleTitle,
+              salary: roleAnswers.newRoleSalary,
+              department_id: res.insertId,
+            },
+            function (err, roleInsertRes) {
+              if (err) {
+                console.log("error : " + err)
+              } else {
+                queryRoleList();
+                console.log("new role added");
+                console.log("empInfo = ", employeeInfo)
+                connection.query("INSERT INTO employee SET ?", {
+                  first_name: employeeInfo.firstName,
+                  last_name: employeeInfo.lastName,
+                  role_id: roleInsertRes.insertId,
+                  manager_id: 1
+                }, (err) => {
+                  if (err) {
+                    console.log(err)
+                  }
+                })
                 queryRoleList();
                 runUserRequest();
+              }
             }
-          }
-    
-        )
+
+          )
           console.log(`new department = ${answer.newDepartmentName} added`);
           return answer.newDepartmentName;
         }
